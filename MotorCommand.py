@@ -7,14 +7,15 @@ import sys
 import rospy
 import numpy
 import time
-import navio2ros.madgwickpubAHRS
 import math
-import navio/Util.h as util
-import navio2ros.leds as led
+import navio.util as util
+import navio.leds as led
 
 # import custom messages that we will have to use (Shawn's Code)
 from navio2ros.msg import RC # for reading in RC values from TX
 from navio2ros.msg import PWM # for outputting values to the servo rail
+from navio2ros.msg import madgwickpubAHRS
+
 
 #RC channel
 rcin = 0
