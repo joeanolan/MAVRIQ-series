@@ -29,7 +29,12 @@ pitch_channel_in = 1
 throttle_channel_in = 2
 yaw_channel_in = 3
 kill_channel_in = 4
-idle = 1000.0
+idle = 1400
+roll_channel_values= [1000.0,1996.0,1495.0]
+pitch_channel_values = [1000.0,1999.0,1499.0]
+throttle_channel_values = [1010.0,1996.0,1480.0]
+yaw_channel_values = [1001.0,1991.0,1500.0]
+
 
 def callback_rc(data):
 	global roll_channel
@@ -88,8 +93,6 @@ def pitchPID(p,i,d, PcurrentTime = None):
                 PlastTime = PcurrentTime
                 Pend+=1
                 
-                
-
 def RollPID(p,i,d, RcurrentTime = None):
         #this section sets values to start PID calculations
         global pid_Roll
@@ -116,9 +119,7 @@ def RollPID(p,i,d, RcurrentTime = None):
                 pid_Roll = (p *Rerror) + (i * RollI) + (d * RollD)
                 RlastError = Rerror
                 RlastTime = RcurrentTime
-                Rend+=1
-                
-                
+                Rend+=1     
 
 def YawPID(p,i,d, YcurrentTime = None):
         #this section sets values to start PID calculations
@@ -148,32 +149,30 @@ def YawPID(p,i,d, YcurrentTime = None):
                 YlastTime = YcurrentTime
                 Yend+=1
 
-
-def rc_commands():
+def rc_commands(): #rc commands linear approximations
         global rc_roll
         global rc_pitch
         global rc_throttle
         global rc_yaw
         rc_roll = (roll_channel - roll_channel_values[2])/(roll_channel_values[1]-roll_channel_values[0])
         rc_pitch = (pitch_channel - pitch_channel_values[2])/(pitch_channel_values[1]-roll_channel_values[0])
-        rc_throttle = ((1480 if throttle_channel > 1470 and throttle_channel < 1490 else throttle_channel) - throttle_channel_values[2])/(throttle_channel_values[1]-throttle_channel_values[0]) #since the throttle center isnt self-centering giving a small range of throttle idle helps make flight easier
+        rc_throttle = ((1480 if throttle_channel > 1460 and throttle_channel < 1500 else throttle_channel) - throttle_channel_values[2])/(throttle_channel_values[1]-throttle_channel_values[0]) #since the throttle center isnt self-centering giving a small range of throttle idle helps make flight easier
         rc_yaw = (yaw_channel - yaw_channel_values[2])/(yaw_channel_values[1]-yaw_channel_values[0])
-        
 
 def motor():
         rc_commands()
         pitchPID(2,1,1) #P,I,D
         RollPID(2,1,1) #P,I,D
         YawPID(2,1,1) #P,I,D
-        base = rc_throttle * 100 + idle
+        base = rc_throttle *800 + idle
         #front motor CCW
-        motor0= base + pid_pitch - pid_Yaw
+        motor0= base + pid_pitch + pid_Yaw - rc_yaw + rc_pitch
         #rear motor (opposite of front motor) CCW
-        motor1= base - pid_pitch - pid_Yaw
+        motor1= base - pid_pitch + pid_Yaw - rc_yaw - rc_pitch
         #left motor CW
-        motor2= base + pid_Roll + pid_Yaw
+        motor2= base + pid_Roll + pid_Yaw + rc_yaw + rc_roll
         #right motor CW
-        motor3= base - pid_Roll + pid_Yaw
+        motor3= base + pid_Roll + pid_Yaw + rc_yaw - rc_roll
         print(motor0,motor1,motor2,motor3)
         
 
@@ -183,14 +182,6 @@ sub = rospy.Subscriber('/rcpub',RC,callback_rc, queue_size=10)
 pub = rospy.Publisher('/motorcommand',PWM, queue_size=10)
 subdata = rospy.Subscriber('/madgwickpub', AHRS, callback_angular, queue_size=3)
 rospy.init_node('MotorCommand', anonymous=True) # register the node
-
-roll_channel_values= [1000.0,1996.0,1495.0]
-pitch_channel_values = [1000.0,1999.0,1499.0]
-throttle_channel_values = [1010.0,1996.0,1480.0]
-yaw_channel_values = [1001.0,1991.0,1500.0]
-
-#rc commands linear approximations
-
 
 
 if __name__ == '__main__':
@@ -202,10 +193,10 @@ if __name__ == '__main__':
                         while kill_channel >= 1200:  
                             pwmout.channel[i] = 1.0
                 for i in range(len(pwmout.channel)):
-                        pwmout.channel[0] = motor0/1000.0
-                        pwmout.channel[1] = motor2/1000.0
-                        pwmout.channel[2] = motor1/1000.0
-                        pwmout.channel[3] = motor3/1000.0
+                        pwmout.channel[i] = motor0/1000.0
+                        pwmout.channel[i] = motor2/1000.0
+                        pwmout.channel[i] = motor1/1000.0
+                        pwmout.channel[i] = motor3/1000.0
                 # publish the topic to motor command
                 pub.publish(pwmout)
                 # this is ros magic, basically just a sleep function with the specified dt
