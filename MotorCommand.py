@@ -208,11 +208,11 @@ if __name__ == '__main__':
                 if kill_channel >= 1200: #in case things go wild
                         while kill_channel >= 1200:  
                             pwmout.channel[i] = 1.0
-                #for i in range(len(pwmout.channel)):
-                pwmout.channel[0] = outval[0]/1000.0
-                pwmout.channel[1] = outval[1]/1000.0
-                pwmout.channel[2] = outval[2]/1000.0
-                pwmout.channel[3] = outval[3]/1000.0
+                for i in range(len(pwmout.channel)):
+                        pwmout.channel[0] = outval[0]/1000.0
+                        pwmout.channel[1] = outval[1]/1000.0
+                        pwmout.channel[2] = outval[2]/1000.0
+                        pwmout.channel[3] = outval[3]/1000.0
                 # publish the topic to motor command
                 pub.publish(pwmout)
                 # this is ros magic, basically just a sleep function with the specified dt
