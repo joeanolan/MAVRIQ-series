@@ -23,7 +23,7 @@ motor0 = 0
 motor1 = 0
 motor2 = 0
 motor3 = 0
-outval= [motor0,motor1,motor2,motor3]
+#outval= [motor0,motor1,motor2,motor3]
 roll_channel_in = 0
 pitch_channel_in = 1
 throttle_channel_in = 2
@@ -65,7 +65,7 @@ def pitchPID(p,i,d, PcurrentTime = None):
         global pid_pitch
         currentPitch = pitch
         PcurrentTime= PcurrentTime if PcurrentTime is not None else time.time()
-        desiredPitch = pitch*(rc_pitch)
+        desiredPitch = pitch*(rc_pitch)*10
         Perror = desiredPitch - currentPitch
         PlastError = Perror
         PlastTime = PcurrentTime
@@ -76,7 +76,7 @@ def pitchPID(p,i,d, PcurrentTime = None):
                 global pid_pitch
                 #time.sleep(0.02) #50hz hold
                 currentPitch = pitch
-                desiredPitch = currentPitch*(rc_pitch)
+                desiredPitch = currentPitch*(rc_pitch)*10
                 PcurrentTime = time.time()
                 Perror = desiredPitch - currentPitch
                 PdeltaTime = PcurrentTime - PlastTime
@@ -95,7 +95,7 @@ def RollPID(p,i,d, RcurrentTime = None):
         global pid_Roll
         currentRoll = roll
         RcurrentTime= RcurrentTime if RcurrentTime is not None else time.time()
-        desiredRoll = roll*(rc_roll)
+        desiredRoll = roll*(rc_roll)*10
         Rerror = desiredRoll - currentRoll
         RlastError = Rerror
         RlastTime = RcurrentTime
@@ -106,7 +106,7 @@ def RollPID(p,i,d, RcurrentTime = None):
                 global pid_Roll
                 #time.sleep(0.02) #50hz hold
                 currentRoll = roll
-                desiredRoll = currentRoll*(rc_roll)
+                desiredRoll = currentRoll*(rc_roll)*10
                 RcurrentTime = time.time()
                 Rerror = desiredRoll - currentRoll
                 RdeltaTime = RcurrentTime - RlastTime
@@ -162,18 +162,18 @@ def rc_commands():
 
 def motor():
         rc_commands()
-        pitchPID(1,1,1) #P,I,D
-        RollPID(1,1,1) #P,I,D
-        YawPID(1,1,1) #P,I,D
-        base = rc_throttle + idle
+        pitchPID(2,1,1) #P,I,D
+        RollPID(2,1,1) #P,I,D
+        YawPID(2,1,1) #P,I,D
+        base = rc_throttle * 100 + idle
         #front motor CCW
-        motor0= base + pid_pitch + pid_Roll + pid_Yaw
+        motor0= base + pid_pitch - pid_Yaw
         #rear motor (opposite of front motor) CCW
-        motor2= base + pid_pitch + pid_Roll + pid_Yaw
+        motor1= base - pid_pitch - pid_Yaw
         #left motor CW
-        motor1= base + pid_pitch + pid_Roll + pid_Yaw
+        motor2= base + pid_Roll + pid_Yaw
         #right motor CW
-        motor3= base + pid_pitch + pid_Roll + pid_Yaw
+        motor3= base - pid_Roll + pid_Yaw
         print(motor0,motor1,motor2,motor3)
         
 
@@ -202,10 +202,10 @@ if __name__ == '__main__':
                         while kill_channel >= 1200:  
                             pwmout.channel[i] = 1.0
                 for i in range(len(pwmout.channel)):
-                        pwmout.channel[4] = outval[0]/1000.0
-                        pwmout.channel[5] = outval[1]/1000.0
-                        pwmout.channel[6] = outval[2]/1000.0
-                        pwmout.channel[7] = outval[3]/1000.0
+                        pwmout.channel[0] = motor0/1000.0
+                        pwmout.channel[1] = motor2/1000.0
+                        pwmout.channel[2] = motor1/1000.0
+                        pwmout.channel[3] = motor3/1000.0
                 # publish the topic to motor command
                 pub.publish(pwmout)
                 # this is ros magic, basically just a sleep function with the specified dt
