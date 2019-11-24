@@ -8,17 +8,18 @@ import rospy
 import numpy
 import time
 import math
-import navio.util as util
-import navio.leds as led
+
 
 # import custom messages that we will have to use (Shawn's Code)
+from navio2ros.msg import AHRS
 from navio2ros.msg import RC # for reading in RC values from TX
 from navio2ros.msg import PWM # for outputting values to the servo rail
-from navio2ros.msg import madgwickpubAHRS
+from navio2ros.msg import Vehicle
 
 
 #RC channel
-rcin = 0
+veh=Vehicle()
+rcin = RC()
 pwmout = PWM()
 motor0 = 0 
 motor1 = 0
@@ -100,7 +101,7 @@ class PID: #https://github.com/ivmech/ivPID/blob/master/PID.py
         self.sample_time = sample_time
 
 
-def rc_calibration(): #idea is to use linear approx for rc inputs however if an rc is changed or replaced this allows for quick calibration
+"""def rc_calibration(): #idea is to use linear approx for rc inputs however if an rc is changed or replaced this allows for quick calibration
         if rcin[0] == 0:
             while rcin[0] == 0: #looping while no RC information
                 #led.setColor('Red')
@@ -108,88 +109,93 @@ def rc_calibration(): #idea is to use linear approx for rc inputs however if an 
                 #led.setColor('Yellow')
                 time.sleep(.5)
             #led.setColor('Green')
-            rc_roll_init=rcin[0]
+            rc_roll_init=roll_channel
             rc_pitch_init=rcin[1]
             rc_throttle_init=1500 #this locks idle position in center stick location
             rc_yaw_init=rcin[3]
-            global roll_channel
-            global pitch_channel
-            global throttle_channel
-            global yaw_channel
             #led.setColor('Green')
             timer=time.time()+3
             while time < timer:
-                roll_channel= [rcin[0],min(rcin[0]),max(rcin[0]),rc_roll_init]
-                pitch_channel = [rcin[1],min(rcin[1]),max(rcin[1]),rc_pitch_init]
-                throttle_channel = [rcin[2],min(rcin[2]),max(rcin[2]),rc_throttle_init]
-                yaw_channel = [rcin[3],min(rcin[3]),max(rcin[3]), rc_yaw_init]
-                #led.setColor('Blue')
+                
+                #led.setColor('Blue')"""
     
 def callback_rc(data):
-	global rcin
-	rcin[0]=data.channel[roll_channel_in]
-	rcin[1]=[pitch_channel_in]
-	rcin[2]=[throttle_channel_in]
-	rcin[3]=[yaw_channel_in]
-	rcin[4]=[kill_channel_in]
+	global roll_channel
+	global pitch_channel
+	global throttle_channel
+	global yaw_channel
+	global kill_channel
+	roll_channel=data.channel[roll_channel_in]
+	pitch_channel=data.channel[pitch_channel_in]
+	throttle_channel=data.channel[throttle_channel_in]
+	yaw_channel=data.channel[yaw_channel_in]
+	kill_channel=data.channel[kill_channel_in]
+	print "callback_rc"
+
+
+def callback_imu(data):
+	global veh
+	global yaw
+	veh.imu.accelerometer.x = data.accelerometer.x
+	veh.imu.accelerometer.y = data.accelerometer.y
+	veh.imu.accelerometer.z = data.accelerometer.z
+	veh.imu.gyroscope.x = data.gyroscope.x
+	veh.imu.gyroscope.y = data.gyroscope.y
+	veh.imu.gyroscope.z = data.gyroscope.z
+	print "callback_imu"
+
+def callback_angular(data):
+	global roll
+	global pitch
+	global yaw
+	roll = data.angular.roll
+	pitch = data.angular.pitch
+	yaw = data.angular.yaw
+	print "roll and pitch"
 
 sub = rospy.Subscriber('/rcpub',RC,callback_rc, queue_size=10)
 pub = rospy.Publisher('/motorcommand',PWM, queue_size=10)
+subdata = rospy.Subscriber('/madgwickpub', AHRS, callback_angular, queue_size=3)
 rospy.init_node('MotorCommand', anonymous=True) # register the node
 
-#IMU setup
-imu=IMU.MPU9250()
-accel, gyro, mag = imu.getMotion9()
-pitch_base = math.atan2(accel[1],accel[2])
-roll_base = math.atan2(accel[0],accel[2])
-throttle_base = 0
-yaw_base = math.atan2((-mag[1] * math.cos(roll_base) + mag[2] * math.sin(roll)),(mag[0] * math.cos(pitch_base) + mag[1] * math.sin(roll_base) + mag[2] * math.sin(pitch_base) * math.cos(roll_base)))
+roll_channel_values= [1000.0,1996.0,1495.0]
+pitch_channel_values = [1000.0,1999.0,1499.0]
+throttle_channel_values = [1010.0,1996.0,1480.0]
+yaw_channel_values = [1001.0,1991.0,1500.0]
 
 #rc commands linear approximations
-rc_roll = (roll_channel[0] - roll_channel[3])/(roll_channel[2]-roll_channel[2])
-rc_pitch = (pitch_channel[0] - pitch_channel[3])/(pitch_channel[2]-pitch_channel[2])
-rc_throttle = ((1500 if throttle_channel > 1480 and throttle_channel < 1520 else throttle_channel[0]) - throttle_channel[3])/(throttle_channel[2]-throttle_channel[2]) #since the throttle center isnt self-centering giving a small range of throttle idle helps make flight easier
-rc_yaw = (yaw_channel[0] - yaw_channel[3])/(yaw_channel[2]-yaw_channel[2])
+rc_roll = (roll_channel - roll_channel_values[2])/(roll_channel_values[1]-roll_channel_values[0])
+rc_pitch = (pitch_channel - pitch_channel_values[2])/(pitch_channel_values[1]-roll_channel_values[0])
+rc_throttle = ((1480 if throttle_channel > 1470 and throttle_channel < 1490 else throttle_channel) - throttle_channel_values[2])/(throttle_channel_values[1]-throttle_channel_values[0]) #since the throttle center isnt self-centering giving a small range of throttle idle helps make flight easier
+rc_yaw = (yaw_channel - yaw_channel_values[2])/(yaw_channel_values[1]-yaw_channel_values[0])
 
 #pid call from PID - this is where you change PID coeffecients 
-pid_throttle= PID(throttle_base, P=1,I=1,D=0)
-pid_pitch= PID(pitch_base,P=1,I=0,D=0)
-pid_roll= PID(roll_base, P=1,I=0,D=0)
-pid_yaw = PID(yaw_base, P=1, I=0, D=0)
-
-idle = 0
-pitch = pitch_base + pid_pitch + rc_pitch
-roll = roll_base + pid_roll +rc_roll
-base = throttle_base + idle
-yaw = yaw_base + pid_yaw + rc_yaw
-
+pid_pitch= PID(pitch,1,0,0)
+pid_roll= PID(roll,1,0,0)
+pid_yaw = PID(yaw,1,0,0)
+idle = 1.0
+base = throttle_channel + idle
 #front motor CCW
-motor0= base + pitch - roll + yaw
+motor0= base + pid_pitch - pid_roll + pid_yaw
 #rear motor (opposite of front motor) CCW
-motor2= base - pitch + roll - yaw
+motor2= base - pid_pitch + pid_roll - pid_yaw
 #left motor CW
-motor1= base + pitch + roll + yaw
+motor1= base + pid_pitch + pid_roll + pid_yaw
 #right motor CW
-motor3= base - pitch - roll - yaw
+motor3= base - pid_pitch - pid_roll - pid_yaw
 
 if __name__ == '__main__':
     try: # try/except block here is a fancy way to allow code to cleanly exit on a keyboard break (ctrl+c)
         while not rospy.is_shutdown():
             rate = rospy.Rate(50)
-            if rcin[0] == 0:
-               rc_calibration()
             if kill_channel >= 1200: #in case things go wild
                 while kill_channel >= 1200:  
                     pwmout.channel[i] = 1.0
                     continue #brings us back to start of while loop
             for i in range(len(pwmout.channel)):
                 pwmout.channel[i] = outval/1000.0 # rc values are integers (1000-2000), we want 1.0-2.0
-                if rcin[0] == 0:
-                    rc_calibration
-                    
             # publish the topic to motor command
             pub.publish(pwmout)
-
             # this is ros magic, basically just a sleep function with the specified dt
             rate.sleep()
 
