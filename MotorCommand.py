@@ -7,11 +7,10 @@ import sys
 import rospy
 import numpy
 import time
-#import AHRS
 import navio2ros.madgwickpubAHRS
 import math
-#import navio/Util.h as util
-#import navio2ros.leds as led
+import navio/Util.h as util
+import navio2ros.leds as led
 
 # import custom messages that we will have to use (Shawn's Code)
 from navio2ros.msg import RC # for reading in RC values from TX
