@@ -1,7 +1,7 @@
 #!/usr/bin/env python
-
-
-
+#
+#
+#
 import os
 import sys
 import rospy
@@ -9,13 +9,11 @@ import numpy
 import time
 import math
 
-
 # import custom messages that we will have to use (Shawn's Code)
 from navio2ros.msg import AHRS
 from navio2ros.msg import RC # for reading in RC values from TX
 from navio2ros.msg import PWM # for outputting values to the servo rail
 from navio2ros.msg import Vehicle
-
 
 #RC channel
 veh=Vehicle()
@@ -31,75 +29,6 @@ pitch_channel_in = 1
 throttle_channel_in = 2
 yaw_channel_in = 3
 kill_channel_in = 4
-
-class PID: #https://github.com/ivmech/ivPID/blob/master/PID.py
-    """PID Controller
-    """
-    def __init__(self, P, I, D, current_time=None):
-        self.Kp = P
-        self.Ki = I
-        self.Kd = D
-
-        self.sample_time = 0.00
-        self.current_time = current_time if current_time is not None else time.time()
-        self.last_time = self.current_time
-        self.clear()
-    def clear(self):
-        """Clears PID computations and coefficients"""
-        self.SetPoint = 0.0
-        self.PTerm = 0.0
-        self.ITerm = 0.0
-        self.DTerm = 0.0
-        self.last_error = 0.0
-        # Windup Guard
-        self.int_error = 0.0
-        self.windup_guard = 20.0
-        self.output = 0.0
-    def update(self, feedback_value, current_time=None):
-        error = self.SetPoint - feedback_value
-        self.current_time = current_time if current_time is not None else time.time()
-        delta_time = self.current_time - self.last_time
-        delta_error = error - self.last_error
-        if (delta_time >= self.sample_time):
-            self.PTerm = self.Kp * error
-            self.ITerm += error * delta_time
-            if (self.ITerm < -self.windup_guard):
-                self.ITerm = -self.windup_guard
-            elif (self.ITerm > self.windup_guard):
-                self.ITerm = self.windup_guard
-            self.DTerm = 0.0
-            if delta_time > 0:
-                self.DTerm = delta_error / delta_time
-            # Remember last time and last error for next calculation
-            self.last_time = self.current_time
-            self.last_error = error
-            self.output = self.PTerm + (self.Ki * self.ITerm) + (self.Kd * self.DTerm)
-    def setKp(self, proportional_gain):
-        """Determines how aggressively the PID reacts to the current error with setting Proportional Gain"""
-        self.Kp = proportional_gain
-    def setKi(self, integral_gain):
-        """Determines how aggressively the PID reacts to the current error with setting Integral Gain"""
-        self.Ki = integral_gain
-    def setKd(self, derivative_gain):
-        """Determines how aggressively the PID reacts to the current error with setting Derivative Gain"""
-        self.Kd = derivative_gain
-    def setWindup(self, windup):
-        """Integral windup, also known as integrator windup or reset windup,
-        refers to the situation in a PID feedback controller where
-        a large change in setpoint occurs (say a positive change)
-        and the integral terms accumulates a significant error
-        during the rise (windup), thus overshooting and continuing
-        to increase as this accumulated error is unwound
-        (offset by errors in the other direction).
-        The specific problem is the excess overshooting.
-        """
-        self.windup_guard = windup
-    def setSampleTime(self, sample_time):
-        """PID that should be updated at a regular interval.
-        Based on a pre-determined sampe time, the PID decides if it should compute or return immediately.
-        """
-        self.sample_time = sample_time
-
 
 """def rc_calibration(): #idea is to use linear approx for rc inputs however if an rc is changed or replaced this allows for quick calibration
         if rcin[0] == 0:
@@ -130,19 +59,15 @@ def callback_rc(data):
 	throttle_channel=data.channel[throttle_channel_in]
 	yaw_channel=data.channel[yaw_channel_in]
 	kill_channel=data.channel[kill_channel_in]
-	print "callback_rc"
-
 
 def callback_imu(data):
 	global veh
-	global yaw
 	veh.imu.accelerometer.x = data.accelerometer.x
 	veh.imu.accelerometer.y = data.accelerometer.y
 	veh.imu.accelerometer.z = data.accelerometer.z
 	veh.imu.gyroscope.x = data.gyroscope.x
 	veh.imu.gyroscope.y = data.gyroscope.y
 	veh.imu.gyroscope.z = data.gyroscope.z
-	print "callback_imu"
 
 def callback_angular(data):
 	global roll
@@ -151,8 +76,107 @@ def callback_angular(data):
 	roll = data.angular.roll
 	pitch = data.angular.pitch
 	yaw = data.angular.yaw
-	print "roll and pitch"
 
+def pitchPID(p,i,d, PcurrentTime = None):
+        #this section sets values to start PID calculations
+        global pid_pitch
+        currentPitch = pitch
+        PcurrentTime= PcurrentTime if PcurrentTime is not None else time.time()
+        desiredPitch = pitch*(rc_pitch)
+        Perror = desiredPitch - currentPitch
+        PlastError = Perror
+        PlastTime = PcurrentTime
+        PitchI=0
+        Pend=2
+        pi=1
+        while pi in range(1,Pend):
+                time.sleep(0.02) #50hz hold
+                currentPitch = pitch
+                desiredPitch = currentPitch*(rc_pitch)
+                PcurrentTime = time.time()
+                Perror = desiredPitch - currentPitch
+                PdeltaTime = PcurrentTime - PlastTime
+                PdeltaError = Perror - PlastError
+                pitchI = Perror * PdeltaTime
+                pitchD = PdeltaError/PdeltaTime
+                pid_pitch = (p *Perror) + (i * pitchI) + (d * pitchD)
+                PlastError = Perror
+                PlastTime = PcurrentTime
+                Pend+=1
+                print pid_pitch
+                return pid_pitch
+
+def RollPID(p,i,d, RcurrentTime = None):
+        #this section sets values to start PID calculations
+        global pid_Roll
+        currentRoll = roll
+        RcurrentTime= RcurrentTime if RcurrentTime is not None else time.time()
+        desiredRoll = roll*(rc_roll)
+        Rerror = desiredRoll - currentRoll
+        RlastError = Rerror
+        RlastTime = RcurrentTime
+        RollI=0
+        Rend=2
+        Ri = 1
+        while Ri in range(1,Rend):
+                time.sleep(0.02) #50hz hold
+                currentRoll = roll
+                desiredRoll = currentRoll*(rc_roll)
+                RcurrentTime = time.time()
+                Rerror = desiredRoll - currentRoll
+                RdeltaTime = RcurrentTime - RlastTime
+                RdeltaError = Rerror - RlastError
+                RollI = Rerror * RdeltaTime
+                RollD = RdeltaError/RdeltaTime
+                pid_Roll = (p *Rerror) + (i * RollI) + (d * RollD)
+                RlastError = Rerror
+                RlastTime = RcurrentTime
+                Rend+=1
+                return pid_Roll
+
+def YawPID(p,i,d, YcurrentTime = None):
+        #this section sets values to start PID calculations
+        global pid_Yaw
+        currentYaw = yaw
+        YcurrentTime= YcurrentTime if YcurrentTime is not None else time.time()
+        desiredYaw = yaw*(rc_yaw)
+        Yerror = desiredYaw - currentYaw
+        YlastError = Yerror
+        YlastTime = YcurrentTime
+        YawI=0
+        Yend=2
+        Yi = 1
+        while Yi in range(1,Yend):
+                time.sleep(0.02) #50hz hold
+                currentYaw = yaw
+                desiredYaw = currentYaw*(rc_yaw)
+                YcurrentTime = time.time()
+                Yerror = desiredYaw - currentYaw
+                YdeltaTime = YcurrentTime - YlastTime
+                YdeltaError = Yerror - YlastError
+                YawI = Yerror * YdeltaTime
+                YawD = YdeltaError/YdeltaTime
+                pid_Yaw = (p *Yerror) + (i * YawI) + (d * YawD)
+                YlastError = Yerror
+                YlastTime = YcurrentTime
+                Yend+=1
+                return pid_Yaw
+
+def motor():
+    pitchPID(0,0,0) #P,I,D
+    RollPID(0,0,0) #P,I,D
+    YawPID(0,0,0) #P,I,D
+    base = throttle_channel + idle
+    #front motor CCW
+    motor0= base + pid_pitch - pid_Roll + pid_Yaw
+    #rear motor (opposite of front motor) CCW
+    motor2= base - pid_pitch + pid_Roll - pid_Yaw
+    #left motor CW
+    motor1= base + pid_pitch + pid_Roll + pid_Yaw
+    #right motor CW
+    motor3= base - pid_pitch - pid_Roll - pid_Yaw
+
+    
 sub = rospy.Subscriber('/rcpub',RC,callback_rc, queue_size=10)
 pub = rospy.Publisher('/motorcommand',PWM, queue_size=10)
 subdata = rospy.Subscriber('/madgwickpub', AHRS, callback_angular, queue_size=3)
@@ -168,32 +192,23 @@ rc_roll = (roll_channel - roll_channel_values[2])/(roll_channel_values[1]-roll_c
 rc_pitch = (pitch_channel - pitch_channel_values[2])/(pitch_channel_values[1]-roll_channel_values[0])
 rc_throttle = ((1480 if throttle_channel > 1470 and throttle_channel < 1490 else throttle_channel) - throttle_channel_values[2])/(throttle_channel_values[1]-throttle_channel_values[0]) #since the throttle center isnt self-centering giving a small range of throttle idle helps make flight easier
 rc_yaw = (yaw_channel - yaw_channel_values[2])/(yaw_channel_values[1]-yaw_channel_values[0])
-
-#pid call from PID - this is where you change PID coeffecients 
-pid_pitch= PID(pitch,1,0,0)
-pid_roll= PID(roll,1,0,0)
-pid_yaw = PID(yaw,1,0,0)
 idle = 1.0
-base = throttle_channel + idle
-#front motor CCW
-motor0= base + pid_pitch - pid_roll + pid_yaw
-#rear motor (opposite of front motor) CCW
-motor2= base - pid_pitch + pid_roll - pid_yaw
-#left motor CW
-motor1= base + pid_pitch + pid_roll + pid_yaw
-#right motor CW
-motor3= base - pid_pitch - pid_roll - pid_yaw
+
 
 if __name__ == '__main__':
-    try: # try/except block here is a fancy way to allow code to cleanly exit on a keyboard break (ctrl+c)
+    try: 
         while not rospy.is_shutdown():
+            motor()
             rate = rospy.Rate(50)
             if kill_channel >= 1200: #in case things go wild
                 while kill_channel >= 1200:  
                     pwmout.channel[i] = 1.0
                     continue #brings us back to start of while loop
             for i in range(len(pwmout.channel)):
-                pwmout.channel[i] = outval/1000.0 # rc values are integers (1000-2000), we want 1.0-2.0
+                pwmout.channel[i] = outval[0]/1000.0
+                pwmout.channel[i] = outval[1]/1000.0
+                pwmout.channel[i] = outval[2]/1000.0
+                pwmout.channel[i] = outval[3]/1000.0
             # publish the topic to motor command
             pub.publish(pwmout)
             # this is ros magic, basically just a sleep function with the specified dt
