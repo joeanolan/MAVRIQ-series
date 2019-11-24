@@ -30,24 +30,6 @@ throttle_channel_in = 2
 yaw_channel_in = 3
 kill_channel_in = 4
 
-"""def rc_calibration(): #idea is to use linear approx for rc inputs however if an rc is changed or replaced this allows for quick calibration
-        if rcin[0] == 0:
-            while rcin[0] == 0: #looping while no RC information
-                #led.setColor('Red')
-                time.sleep(.5)
-                #led.setColor('Yellow')
-                time.sleep(.5)
-            #led.setColor('Green')
-            rc_roll_init=roll_channel
-            rc_pitch_init=rcin[1]
-            rc_throttle_init=1500 #this locks idle position in center stick location
-            rc_yaw_init=rcin[3]
-            #led.setColor('Green')
-            timer=time.time()+3
-            while time < timer:
-                
-                #led.setColor('Blue')"""
-    
 def callback_rc(data):
 	global roll_channel
 	global pitch_channel
@@ -87,9 +69,10 @@ def pitchPID(p,i,d, PcurrentTime = None):
         PlastError = Perror
         PlastTime = PcurrentTime
         PitchI=0
-        Pend=2
+        Pend=200
         pi=1
         while pi in range(1,Pend):
+                global pid_pitch
                 time.sleep(0.02) #50hz hold
                 currentPitch = pitch
                 desiredPitch = currentPitch*(rc_pitch)
@@ -104,7 +87,7 @@ def pitchPID(p,i,d, PcurrentTime = None):
                 PlastTime = PcurrentTime
                 Pend+=1
                 print pid_pitch
-                return pid_pitch
+                
 
 def RollPID(p,i,d, RcurrentTime = None):
         #this section sets values to start PID calculations
@@ -116,9 +99,10 @@ def RollPID(p,i,d, RcurrentTime = None):
         RlastError = Rerror
         RlastTime = RcurrentTime
         RollI=0
-        Rend=2
+        Rend=200
         Ri = 1
         while Ri in range(1,Rend):
+                global pid_Roll
                 time.sleep(0.02) #50hz hold
                 currentRoll = roll
                 desiredRoll = currentRoll*(rc_roll)
@@ -132,7 +116,8 @@ def RollPID(p,i,d, RcurrentTime = None):
                 RlastError = Rerror
                 RlastTime = RcurrentTime
                 Rend+=1
-                return pid_Roll
+                
+                
 
 def YawPID(p,i,d, YcurrentTime = None):
         #this section sets values to start PID calculations
@@ -144,9 +129,10 @@ def YawPID(p,i,d, YcurrentTime = None):
         YlastError = Yerror
         YlastTime = YcurrentTime
         YawI=0
-        Yend=2
+        Yend=200
         Yi = 1
         while Yi in range(1,Yend):
+                global pid_Yaw
                 time.sleep(0.02) #50hz hold
                 currentYaw = yaw
                 desiredYaw = currentYaw*(rc_yaw)
@@ -156,25 +142,48 @@ def YawPID(p,i,d, YcurrentTime = None):
                 YdeltaError = Yerror - YlastError
                 YawI = Yerror * YdeltaTime
                 YawD = YdeltaError/YdeltaTime
-                pid_Yaw = (p *Yerror) + (i * YawI) + (d * YawD)
+                pid_Yaw = (p * Yerror) + (i * YawI) + (d * YawD)
                 YlastError = Yerror
                 YlastTime = YcurrentTime
                 Yend+=1
-                return pid_Yaw
+                
 
 def motor():
-    pitchPID(0,0,0) #P,I,D
-    RollPID(0,0,0) #P,I,D
-    YawPID(0,0,0) #P,I,D
-    base = throttle_channel + idle
-    #front motor CCW
-    motor0= base + pid_pitch - pid_Roll + pid_Yaw
-    #rear motor (opposite of front motor) CCW
-    motor2= base - pid_pitch + pid_Roll - pid_Yaw
-    #left motor CW
-    motor1= base + pid_pitch + pid_Roll + pid_Yaw
-    #right motor CW
-    motor3= base - pid_pitch - pid_Roll - pid_Yaw
+        rc_commands()
+        pitchPID(0,0,0) #P,I,D
+        RollPID(0,0,0) #P,I,D
+        YawPID(0,0,0) #P,I,D
+        i = 1
+        end = 200
+        for i in range(1,end):
+                base = rc_throttle + idle
+                #front motor CCW
+                motor0= base + pid_pitch - pid_Roll + pid_Yaw
+                #rear motor (opposite of front motor) CCW
+                motor2= base - pid_pitch + pid_Roll - pid_Yaw
+                #left motor CW
+                motor1= base + pid_pitch + pid_Roll + pid_Yaw
+                #right motor CW
+                motor3= base - pid_pitch - pid_Roll - pid_Yaw
+                print(motor0,motor1,motor2,motor3)
+                i+=1
+
+def rc_commands():
+        global rc_roll
+        global rc_pitch
+        global rc_throttlesudo
+        global rc_yaw
+        rci = 1
+        rcend = 200
+        for rci in range(rci,rcend):
+                rc_roll = (roll_channel - roll_channel_values[2])/(roll_channel_values[1]-roll_channel_values[0])
+                rc_pitch = (pitch_channel - pitch_channel_values[2])/(pitch_channel_values[1]-roll_channel_values[0])
+                rc_throttle = ((1480 if throttle_channel > 1470 and throttle_channel < 1490 else throttle_channel) - throttle_channel_values[2])/(throttle_channel_values[1]-throttle_channel_values[0]) #since the throttle center isnt self-centering giving a small range of throttle idle helps make flight easier
+                rc_yaw = (yaw_channel - yaw_channel_values[2])/(yaw_channel_values[1]-yaw_channel_values[0])
+                idle = 1.0
+                rcend += 1
+
+
 
     
 sub = rospy.Subscriber('/rcpub',RC,callback_rc, queue_size=10)
@@ -188,31 +197,26 @@ throttle_channel_values = [1010.0,1996.0,1480.0]
 yaw_channel_values = [1001.0,1991.0,1500.0]
 
 #rc commands linear approximations
-rc_roll = (roll_channel - roll_channel_values[2])/(roll_channel_values[1]-roll_channel_values[0])
-rc_pitch = (pitch_channel - pitch_channel_values[2])/(pitch_channel_values[1]-roll_channel_values[0])
-rc_throttle = ((1480 if throttle_channel > 1470 and throttle_channel < 1490 else throttle_channel) - throttle_channel_values[2])/(throttle_channel_values[1]-throttle_channel_values[0]) #since the throttle center isnt self-centering giving a small range of throttle idle helps make flight easier
-rc_yaw = (yaw_channel - yaw_channel_values[2])/(yaw_channel_values[1]-yaw_channel_values[0])
-idle = 1.0
+
 
 
 if __name__ == '__main__':
     try: 
         while not rospy.is_shutdown():
-            motor()
-            rate = rospy.Rate(50)
-            if kill_channel >= 1200: #in case things go wild
-                while kill_channel >= 1200:  
-                    pwmout.channel[i] = 1.0
-                    continue #brings us back to start of while loop
-            for i in range(len(pwmout.channel)):
-                pwmout.channel[i] = outval[0]/1000.0
-                pwmout.channel[i] = outval[1]/1000.0
-                pwmout.channel[i] = outval[2]/1000.0
-                pwmout.channel[i] = outval[3]/1000.0
-            # publish the topic to motor command
-            pub.publish(pwmout)
-            # this is ros magic, basically just a sleep function with the specified dt
-            rate.sleep()
+                motor()
+                rate = rospy.Rate(50)
+                if kill_channel >= 1200: #in case things go wild
+                        while kill_channel >= 1200:  
+                            pwmout.channel[i] = 1.0
+                #for i in range(len(pwmout.channel)):
+                pwmout.channel[0] = outval[0]/1000.0
+                pwmout.channel[1] = outval[1]/1000.0
+                pwmout.channel[2] = outval[2]/1000.0
+                pwmout.channel[3] = outval[3]/1000.0
+                # publish the topic to motor command
+                pub.publish(pwmout)
+                # this is ros magic, basically just a sleep function with the specified dt
+                rate.sleep()
 
     # as stated before, try/except is used to nicely quit the program using ctrl+c
     except rospy.ROSInterruptException:
