@@ -19,10 +19,13 @@ from navio2ros.msg import Vehicle
 veh=Vehicle()
 rcin = RC()
 pwmout = PWM()
-motor0 = 0 
+motor0 = 0
 motor1 = 0
 motor2 = 0
 motor3 = 0
+
+
+
 #outval= [motor0,motor1,motor2,motor3]
 roll_channel_in = 0
 pitch_channel_in = 1
@@ -34,6 +37,7 @@ roll_channel_values= [1000.0,1996.0,1495.0]
 pitch_channel_values = [1000.0,1999.0,1499.0]
 throttle_channel_values = [1010.0,1996.0,1480.0]
 yaw_channel_values = [1001.0,1991.0,1500.0]
+
 
 
 def callback_rc(data):
@@ -92,6 +96,7 @@ def pitchPID(p,i,d, PcurrentTime = None):
                 PlastError = Perror
                 PlastTime = PcurrentTime
                 Pend+=1
+                print(PlastTime,PlastError,PcurrentTime,Perror,pitchI,pitchD,pid_pitch)
                 
 def RollPID(p,i,d, RcurrentTime = None):
         #this section sets values to start PID calculations
@@ -119,7 +124,8 @@ def RollPID(p,i,d, RcurrentTime = None):
                 pid_Roll = (p *Rerror) + (i * RollI) + (d * RollD)
                 RlastError = Rerror
                 RlastTime = RcurrentTime
-                Rend+=1     
+                Rend+=1
+                #print(RlastTime,RlastError,RcurrentTime,Rerror,RollI,RollD,pid_Roll)
 
 def YawPID(p,i,d, YcurrentTime = None):
         #this section sets values to start PID calculations
@@ -148,6 +154,7 @@ def YawPID(p,i,d, YcurrentTime = None):
                 YlastError = Yerror
                 YlastTime = YcurrentTime
                 Yend+=1
+                #print(YlastTime,YlastError,YcurrentTime,Yerror,YawI,YawD,pid_Yaw)
 
 def rc_commands(): #rc commands linear approximations
         global rc_roll
@@ -160,43 +167,43 @@ def rc_commands(): #rc commands linear approximations
         rc_yaw = (yaw_channel - yaw_channel_values[2])/(yaw_channel_values[1]-yaw_channel_values[0])
 
 def motor():
+        global motor0
+        global motor1
+        global motor2
+        global motor3
         rc_commands()
         pitchPID(2,1,1) #P,I,D
         RollPID(2,1,1) #P,I,D
-        YawPID(2,1,1) #P,I,D
+        YawPID(0,0,0) #P,I,D
         base = rc_throttle *800 + idle
         #front motor CCW
-        motor0= base + pid_pitch + pid_Yaw - rc_yaw + rc_pitch
+        motor0=(base + pid_pitch + pid_Yaw - rc_yaw + rc_pitch)/1000
         #rear motor (opposite of front motor) CCW
-        motor1= base - pid_pitch + pid_Yaw - rc_yaw - rc_pitch
+        motor1=(base - pid_pitch + pid_Yaw - rc_yaw - rc_pitch)/1000 
         #left motor CW
-        motor2= base + pid_Roll + pid_Yaw + rc_yaw + rc_roll
+        motor2= (base + pid_Roll + pid_Yaw + rc_yaw + rc_roll)/1000
         #right motor CW
-        motor3= base + pid_Roll + pid_Yaw + rc_yaw - rc_roll
-        print(motor0,motor1,motor2,motor3)
+        motor3= (base + pid_Roll + pid_Yaw + rc_yaw - rc_roll)/1000
         
-
-
-    
+          
 sub = rospy.Subscriber('/rcpub',RC,callback_rc, queue_size=10)
 pub = rospy.Publisher('/motorcommand',PWM, queue_size=10)
 subdata = rospy.Subscriber('/madgwickpub', AHRS, callback_angular, queue_size=3)
 rospy.init_node('MotorCommand', anonymous=True) # register the node
 
-
 if __name__ == '__main__':
     try: 
         while not rospy.is_shutdown():
-                motor()
                 rate = rospy.Rate(50)
-                if kill_channel >= 1200: #in case things go wild
-                        while kill_channel >= 1200:  
-                            pwmout.channel[i] = 1.0
                 for i in range(len(pwmout.channel)):
-                        pwmout.channel[i] = motor0/1000.0
-                        pwmout.channel[i] = motor2/1000.0
-                        pwmout.channel[i] = motor1/1000.0
-                        pwmout.channel[i] = motor3/1000.0
+                        motor()
+                        if kill_channel >= 1200: #in case things go wild
+                                while kill_channel >= 1200:  
+                                    pwmout.channel[i] = 1.0
+                        pwmout.channel[0] = motor0
+                        pwmout.channel[1] = motor1
+                        pwmout.channel[2] = motor2
+                        pwmout.channel[3] = motor3
                 # publish the topic to motor command
                 pub.publish(pwmout)
                 # this is ros magic, basically just a sleep function with the specified dt
