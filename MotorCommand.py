@@ -68,14 +68,15 @@ def callback_angular(data):
 	roll = data.angular.roll
 	pitch = data.angular.pitch
 	yaw = data.angular.yaw
+	#print("Roll is:", roll, "Pitch:", pitch,"Yaw:",yaw)
 
 def pitchPID(p,i,d, PcurrentTime = None):
         #this section sets values to start PID calculations
         global pid_pitch
-        currentPitch = pitch
+        basePitch=0
         PcurrentTime= PcurrentTime if PcurrentTime is not None else time.time()
-        desiredPitch = pitch*(rc_pitch)*10
-        Perror = desiredPitch - currentPitch
+        desiredPitch = basePitch + (rc_pitch * 71) if abs((rc_pitch * 71) + pitch) <= 40 else (-35 if basePitch + (rc_pitch * 71) < 0 else 35) #abs used to remove signs of linear approximation of rc commands, 14.2 converts max range of 500 into 35 degree max
+        Perror = desiredPitch - pitch
         PlastError = Perror
         PlastTime = PcurrentTime
         PitchI=0
@@ -83,11 +84,9 @@ def pitchPID(p,i,d, PcurrentTime = None):
         pi=1
         for pi in range(1,Pend):
                 global pid_pitch
-                #time.sleep(0.02) #50hz hold
-                currentPitch = pitch
-                desiredPitch = currentPitch*(rc_pitch)*10
+                desiredPitch = basePitch + (rc_pitch * 71) if abs((rc_pitch * 71) + pitch) <= 40 else (-35 if basePitch + (rc_pitch * 71) < 0 else 35)  #abs used to remove signs of linear approximation of rc commands, 14.2 converts max range of 500 into 35 degree max
                 PcurrentTime = time.time()
-                Perror = desiredPitch - currentPitch
+                Perror = desiredPitch - pitch
                 PdeltaTime = PcurrentTime - PlastTime
                 PdeltaError = Perror - PlastError
                 pitchI = Perror * PdeltaTime
@@ -96,15 +95,15 @@ def pitchPID(p,i,d, PcurrentTime = None):
                 PlastError = Perror
                 PlastTime = PcurrentTime
                 Pend+=1
-                print(PlastTime,PlastError,PcurrentTime,Perror,pitchI,pitchD,pid_pitch)
+                #print(PlastTime,PlastError,PcurrentTime,Perror,pitchI,pitchD,pid_pitch)
                 
 def RollPID(p,i,d, RcurrentTime = None):
         #this section sets values to start PID calculations
         global pid_Roll
-        currentRoll = roll
+        baseRoll = 0
         RcurrentTime= RcurrentTime if RcurrentTime is not None else time.time()
-        desiredRoll = roll*(rc_roll)*10
-        Rerror = desiredRoll - currentRoll
+        desiredRoll = baseRoll + (rc_roll * 71) if abs((rc_roll * 71) + roll) <= 40 else (-35 if baseRoll + (rc_roll * 71) < 0 else 35)
+        Rerror = desiredRoll - roll
         RlastError = Rerror
         RlastTime = RcurrentTime
         RollI=0
@@ -112,11 +111,9 @@ def RollPID(p,i,d, RcurrentTime = None):
         Ri = 1
         for Ri in range(1,Rend):
                 global pid_Roll
-                #time.sleep(0.02) #50hz hold
-                currentRoll = roll
-                desiredRoll = currentRoll*(rc_roll)*10
+                desiredRoll = baseRoll + (rc_roll * 71) if abs((rc_roll * 71) + roll) <= 40 else (-35 if baseRoll + (rc_roll * 71) < 0 else 35)
                 RcurrentTime = time.time()
-                Rerror = desiredRoll - currentRoll
+                Rerror = desiredRoll - roll
                 RdeltaTime = RcurrentTime - RlastTime
                 RdeltaError = Rerror - RlastError
                 RollI = Rerror * RdeltaTime
@@ -125,15 +122,14 @@ def RollPID(p,i,d, RcurrentTime = None):
                 RlastError = Rerror
                 RlastTime = RcurrentTime
                 Rend+=1
-                #print(RlastTime,RlastError,RcurrentTime,Rerror,RollI,RollD,pid_Roll)
+                print(desiredRoll)
 
 def YawPID(p,i,d, YcurrentTime = None):
         #this section sets values to start PID calculations
         global pid_Yaw
-        currentYaw = yaw
         YcurrentTime= YcurrentTime if YcurrentTime is not None else time.time()
-        desiredYaw = yaw*(rc_yaw)
-        Yerror = desiredYaw - currentYaw
+        desiredYaw = yaw + (rc_yaw *14.2)
+        Yerror = desiredYaw - yaw
         YlastError = Yerror
         YlastTime = YcurrentTime
         YawI=0
@@ -141,11 +137,9 @@ def YawPID(p,i,d, YcurrentTime = None):
         Yi = 1
         for Yi in range(1,Yend):
                 global pid_Yaw
-                #time.sleep(0.02) #50hz hold
-                currentYaw = yaw
-                desiredYaw = currentYaw*(rc_yaw)
+                desiredYaw = yaw + (rc_yaw * 14.2)
                 YcurrentTime = time.time()
-                Yerror = desiredYaw - currentYaw
+                Yerror = desiredYaw - yaw
                 YdeltaTime = YcurrentTime - YlastTime
                 YdeltaError = Yerror - YlastError
                 YawI = Yerror * YdeltaTime
@@ -172,19 +166,19 @@ def motor():
         global motor2
         global motor3
         rc_commands()
-        pitchPID(2,1,1) #P,I,D
-        RollPID(2,1,1) #P,I,D
-        YawPID(0,0,0) #P,I,D
+        pitchPID(3.32,2.87,0.95) #P,I,D
+        RollPID(3.23,2.87,0.95) #P,I,D Ku = 5.5 Tu = 2.3sec Ki = Kp/ti Kd=Kp *td ti=Tu/2=1.15 td=tu/8=.2875 or ki = 1.2/Ku/Tu and kd = 0.075*ku*tu
+        YawPID(1,0,0) #P,I,D
         base = rc_throttle *800 + idle
         #front motor CCW
-        motor0=(base + pid_pitch + pid_Yaw - rc_yaw + rc_pitch)/1000
+        motor0=(base + pid_pitch + pid_Yaw)/1000 if ((base + pid_pitch + pid_Yaw)/1000) <=2.0 else 2.0
         #rear motor (opposite of front motor) CCW
-        motor1=(base - pid_pitch + pid_Yaw - rc_yaw - rc_pitch)/1000 
+        motor1=(base - pid_pitch + pid_Yaw)/1000 if ((base - pid_pitch + pid_Yaw)/1000) <=2.0 else 2.0
         #left motor CW
-        motor2= (base + pid_Roll + pid_Yaw + rc_yaw + rc_roll)/1000
+        motor2= (base + pid_Roll + pid_Yaw)/1000 if ((base + pid_Roll + pid_Yaw)/1000) <=2.0 else 2.0
         #right motor CW
-        motor3= (base + pid_Roll + pid_Yaw + rc_yaw - rc_roll)/1000
-        
+        motor3= (base - pid_Roll + pid_Yaw)/1000 if ((base - pid_Roll + pid_Yaw)/1000) <=2.0 else 2.0
+        #print(motor0,motor1,motor2,motor3)
           
 sub = rospy.Subscriber('/rcpub',RC,callback_rc, queue_size=10)
 pub = rospy.Publisher('/motorcommand',PWM, queue_size=10)
@@ -200,10 +194,10 @@ if __name__ == '__main__':
                         if kill_channel >= 1200: #in case things go wild
                                 while kill_channel >= 1200:  
                                     pwmout.channel[i] = 1.0
-                        pwmout.channel[0] = motor0
-                        pwmout.channel[1] = motor1
-                        pwmout.channel[2] = motor2
-                        pwmout.channel[3] = motor3
+                        pwmout.channel[0] = motor0 if motor0 >= 1.0 else 1.0
+                        pwmout.channel[1] = motor1 if motor1 >= 1.0 else 1.0
+                        pwmout.channel[2] = motor2 if motor2 >= 1.0 else 1.0
+                        pwmout.channel[3] = motor3 if motor3 >= 1.0 else 1.0
                 # publish the topic to motor command
                 pub.publish(pwmout)
                 # this is ros magic, basically just a sleep function with the specified dt
