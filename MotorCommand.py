@@ -73,9 +73,8 @@ def callback_angular(data):
 def pitchPID(p,i,d, PcurrentTime = None):
         #this section sets values to start PID calculations
         global pid_pitch
-        basePitch=0
         PcurrentTime= PcurrentTime if PcurrentTime is not None else time.time()
-        desiredPitch = basePitch + (rc_pitch * 71) if abs((rc_pitch * 71) + pitch) <= 40 else (-35 if basePitch + (rc_pitch * 71) < 0 else 35) #abs used to remove signs of linear approximation of rc commands, 14.2 converts max range of 500 into 35 degree max
+        desiredPitch = rc_pitch * 71 if abs((rc_pitch * 71) + pitch) <= 40 else (-35 if basePitch + (rc_pitch * 71) < 0 else 35) #abs used to remove signs of linear approximation of rc commands, 71 converts max range of +-500 into 35 degree max
         Perror = desiredPitch - pitch
         PlastError = Perror
         PlastTime = PcurrentTime
@@ -84,7 +83,7 @@ def pitchPID(p,i,d, PcurrentTime = None):
         pi=1
         for pi in range(1,Pend):
                 global pid_pitch
-                desiredPitch = basePitch + (rc_pitch * 71) if abs((rc_pitch * 71) + pitch) <= 40 else (-35 if basePitch + (rc_pitch * 71) < 0 else 35)  #abs used to remove signs of linear approximation of rc commands, 14.2 converts max range of 500 into 35 degree max
+                desiredPitch = rc_pitch * 71 if abs((rc_pitch * 71) + pitch) <= 40 else (-35 if basePitch + (rc_pitch * 71) < 0 else 35)  #abs used to remove signs of linear approximation of rc commands, 14.2 converts max range of 500 into 35 degree max
                 PcurrentTime = time.time()
                 Perror = desiredPitch - pitch
                 PdeltaTime = PcurrentTime - PlastTime
@@ -100,9 +99,8 @@ def pitchPID(p,i,d, PcurrentTime = None):
 def RollPID(p,i,d, RcurrentTime = None):
         #this section sets values to start PID calculations
         global pid_Roll
-        baseRoll = 0
         RcurrentTime= RcurrentTime if RcurrentTime is not None else time.time()
-        desiredRoll = baseRoll + (rc_roll * 71) if abs((rc_roll * 71) + roll) <= 40 else (-35 if baseRoll + (rc_roll * 71) < 0 else 35)
+        desiredRoll = rc_roll * 71 if abs((rc_roll * 71) + roll) <= 40 else (-35 if baseRoll + (rc_roll * 71) < 0 else 35)
         Rerror = desiredRoll - roll
         RlastError = Rerror
         RlastTime = RcurrentTime
@@ -111,7 +109,7 @@ def RollPID(p,i,d, RcurrentTime = None):
         Ri = 1
         for Ri in range(1,Rend):
                 global pid_Roll
-                desiredRoll = baseRoll + (rc_roll * 71) if abs((rc_roll * 71) + roll) <= 40 else (-35 if baseRoll + (rc_roll * 71) < 0 else 35)
+                desiredRoll = rc_roll * 71 if abs((rc_roll * 71) + roll) <= 40 else (-35 if baseRoll + (rc_roll * 71) < 0 else 35)
                 RcurrentTime = time.time()
                 Rerror = desiredRoll - roll
                 RdeltaTime = RcurrentTime - RlastTime
@@ -128,7 +126,7 @@ def YawPID(p,i,d, YcurrentTime = None):
         #this section sets values to start PID calculations
         global pid_Yaw
         YcurrentTime= YcurrentTime if YcurrentTime is not None else time.time()
-        desiredYaw = yaw + (rc_yaw *14.2)
+        desiredYaw = yaw + (rc_yaw *71)
         Yerror = desiredYaw - yaw
         YlastError = Yerror
         YlastTime = YcurrentTime
@@ -137,7 +135,7 @@ def YawPID(p,i,d, YcurrentTime = None):
         Yi = 1
         for Yi in range(1,Yend):
                 global pid_Yaw
-                desiredYaw = yaw + (rc_yaw * 14.2)
+                desiredYaw = yaw + (rc_yaw * 71)
                 YcurrentTime = time.time()
                 Yerror = desiredYaw - yaw
                 YdeltaTime = YcurrentTime - YlastTime
@@ -168,7 +166,7 @@ def motor():
         rc_commands()
         pitchPID(3.32,2.87,0.95) #P,I,D
         RollPID(3.23,2.87,0.95) #P,I,D Ku = 5.5 Tu = 2.3sec Ki = Kp/ti Kd=Kp *td ti=Tu/2=1.15 td=tu/8=.2875 or ki = 1.2/Ku/Tu and kd = 0.075*ku*tu
-        YawPID(1,0,0) #P,I,D
+        YawPID(1,0,0) #P,I,D Yaw not calibrated yet
         base = rc_throttle *800 + idle
         #front motor CCW
         motor0=(base + pid_pitch + pid_Yaw)/1000 if ((base + pid_pitch + pid_Yaw)/1000) <=2.0 else 2.0
