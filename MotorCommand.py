@@ -19,10 +19,10 @@ from navio2ros.msg import Vehicle
 veh=Vehicle()
 rcin = RC()
 pwmout = PWM()
-motor0 = 0
-motor1 = 0
-motor2 = 0
-motor3 = 0
+motor0 = 0.0
+motor1 = 0.0
+motor2 = 0.0
+motor3 = 0.0
 
 
 
@@ -32,7 +32,7 @@ pitch_channel_in = 1
 throttle_channel_in = 2
 yaw_channel_in = 3
 kill_channel_in = 4
-idle = 1400
+idle = 1400.0
 roll_channel_values= [1000.0,1996.0,1495.0]
 pitch_channel_values = [1000.0,1999.0,1499.0]
 throttle_channel_values = [1010.0,1996.0,1480.0]
@@ -70,11 +70,11 @@ def callback_angular(data):
 	yaw = data.angular.yaw
 	#print("Roll is:", roll, "Pitch:", pitch,"Yaw:",yaw)
 
-def pitchPID(p,i,d, PcurrentTime = None):
+def pitchPID(p,i,d, PcurrentTime = None, pitchI=0.0):
         #this section sets values to start PID calculations
         global pid_pitch
         PcurrentTime= PcurrentTime if PcurrentTime is not None else time.time()
-        desiredPitch = rc_pitch * 71 if abs((rc_pitch * 71) + pitch) <= 40 else (-35 if basePitch + (rc_pitch * 71) < 0 else 35) #abs used to remove signs of linear approximation of rc commands, 71 converts max range of +-500 into 35 degree max
+        desiredPitch = (rc_pitch * 71.0) if abs((rc_pitch * 71.0) + pitch) <= 35.0 else (-35.0 if (rc_pitch * 71.0) < 0 else 35.0) #abs used to remove signs of linear approximation of rc commands, 71 converts max range of 500 into 35 degree max
         Perror = desiredPitch - pitch
         PlastError = Perror
         PlastTime = PcurrentTime
@@ -83,12 +83,12 @@ def pitchPID(p,i,d, PcurrentTime = None):
         pi=1
         for pi in range(1,Pend):
                 global pid_pitch
-                desiredPitch = rc_pitch * 71 if abs((rc_pitch * 71) + pitch) <= 40 else (-35 if basePitch + (rc_pitch * 71) < 0 else 35)  #abs used to remove signs of linear approximation of rc commands, 14.2 converts max range of 500 into 35 degree max
+                desiredPitch = (rc_pitch * 71.0) if abs((rc_pitch * 71.0) + pitch) <= 35.0 else (-35.0 if (rc_pitch * 71.0) < 0.0 else 35.0)  #abs used to remove signs of linear approximation of rc commands, 71 converts max range of 500 into 35 degree max
                 PcurrentTime = time.time()
                 Perror = desiredPitch - pitch
                 PdeltaTime = PcurrentTime - PlastTime
                 PdeltaError = Perror - PlastError
-                pitchI = Perror * PdeltaTime
+                pitchI += Perror * PdeltaTime
                 pitchD = PdeltaError/PdeltaTime
                 pid_pitch = (p *Perror) + (i * pitchI) + (d * pitchD)
                 PlastError = Perror
@@ -96,11 +96,11 @@ def pitchPID(p,i,d, PcurrentTime = None):
                 Pend+=1
                 #print(PlastTime,PlastError,PcurrentTime,Perror,pitchI,pitchD,pid_pitch)
                 
-def RollPID(p,i,d, RcurrentTime = None):
+def RollPID(p,i,d, RcurrentTime = None,RollI = 0.0):
         #this section sets values to start PID calculations
         global pid_Roll
         RcurrentTime= RcurrentTime if RcurrentTime is not None else time.time()
-        desiredRoll = rc_roll * 71 if abs((rc_roll * 71) + roll) <= 40 else (-35 if baseRoll + (rc_roll * 71) < 0 else 35)
+        desiredRoll = (rc_roll * 71.0) if abs((rc_roll * 71.0) + roll) <= 35.0 else (-35.0 if (rc_roll * 71.0) < 0.0 else 35.0)
         Rerror = desiredRoll - roll
         RlastError = Rerror
         RlastTime = RcurrentTime
@@ -109,24 +109,24 @@ def RollPID(p,i,d, RcurrentTime = None):
         Ri = 1
         for Ri in range(1,Rend):
                 global pid_Roll
-                desiredRoll = rc_roll * 71 if abs((rc_roll * 71) + roll) <= 40 else (-35 if baseRoll + (rc_roll * 71) < 0 else 35)
+                desiredRoll = (rc_roll * 71.0) if abs((rc_roll * 71.0) + roll) <= 35.0 else (-35.0 if (rc_roll * 71.0) < 0.0 else 35.0)
                 RcurrentTime = time.time()
                 Rerror = desiredRoll - roll
                 RdeltaTime = RcurrentTime - RlastTime
                 RdeltaError = Rerror - RlastError
-                RollI = Rerror * RdeltaTime
+                RollI += Rerror * RdeltaTime
                 RollD = RdeltaError/RdeltaTime
                 pid_Roll = (p *Rerror) + (i * RollI) + (d * RollD)
                 RlastError = Rerror
                 RlastTime = RcurrentTime
                 Rend+=1
-                print(desiredRoll)
+                #print(desiredRoll)
 
-def YawPID(p,i,d, YcurrentTime = None):
+def YawPID(p,i,d, YcurrentTime = None, YawI = 0.0):
         #this section sets values to start PID calculations
         global pid_Yaw
         YcurrentTime= YcurrentTime if YcurrentTime is not None else time.time()
-        desiredYaw = yaw + (rc_yaw *71)
+        desiredYaw = yaw + (rc_yaw * 71.0)
         Yerror = desiredYaw - yaw
         YlastError = Yerror
         YlastTime = YcurrentTime
@@ -135,12 +135,12 @@ def YawPID(p,i,d, YcurrentTime = None):
         Yi = 1
         for Yi in range(1,Yend):
                 global pid_Yaw
-                desiredYaw = yaw + (rc_yaw * 71)
+                desiredYaw = yaw + (rc_yaw * 71.0)
                 YcurrentTime = time.time()
                 Yerror = desiredYaw - yaw
                 YdeltaTime = YcurrentTime - YlastTime
                 YdeltaError = Yerror - YlastError
-                YawI = Yerror * YdeltaTime
+                YawI += Yerror * YdeltaTime
                 YawD = YdeltaError/YdeltaTime
                 pid_Yaw = (p * Yerror) + (i * YawI) + (d * YawD)
                 YlastError = Yerror
@@ -164,9 +164,9 @@ def motor():
         global motor2
         global motor3
         rc_commands()
-        pitchPID(3.32,2.87,0.95) #P,I,D
-        RollPID(3.23,2.87,0.95) #P,I,D Ku = 5.5 Tu = 2.3sec Ki = Kp/ti Kd=Kp *td ti=Tu/2=1.15 td=tu/8=.2875 or ki = 1.2/Ku/Tu and kd = 0.075*ku*tu
-        YawPID(1,0,0) #P,I,D Yaw not calibrated yet
+        pitchPID(1,0,0) #P,I,D
+        RollPID(0.54,0.32,0.08) #P,I,D ku=0.9 tu = 2
+        YawPID(1,0,0) #P,I,D
         base = rc_throttle *800 + idle
         #front motor CCW
         motor0=(base + pid_pitch + pid_Yaw)/1000 if ((base + pid_pitch + pid_Yaw)/1000) <=2.0 else 2.0
