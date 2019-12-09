@@ -126,7 +126,7 @@ def YawPID(p,i,d, YcurrentTime = None, YawI = 0.0):
         #this section sets values to start PID calculations
         global pid_Yaw
         YcurrentTime= YcurrentTime if YcurrentTime is not None else time.time()
-        desiredYaw = yaw + (rc_yaw * 71.0)
+        desiredYaw = yaw + (rc_yaw * 360.0)
         Yerror = desiredYaw - yaw
         YlastError = Yerror
         YlastTime = YcurrentTime
@@ -135,7 +135,7 @@ def YawPID(p,i,d, YcurrentTime = None, YawI = 0.0):
         Yi = 1
         for Yi in range(1,Yend):
                 global pid_Yaw
-                desiredYaw = yaw + (rc_yaw * 71.0)
+                desiredYaw = yaw + (rc_yaw * 360.0)
                 YcurrentTime = time.time()
                 Yerror = desiredYaw - yaw
                 YdeltaTime = YcurrentTime - YlastTime
@@ -146,7 +146,7 @@ def YawPID(p,i,d, YcurrentTime = None, YawI = 0.0):
                 YlastError = Yerror
                 YlastTime = YcurrentTime
                 Yend+=1
-                #print(YlastTime,YlastError,YcurrentTime,Yerror,YawI,YawD,pid_Yaw)
+                print(desiredYaw,Yerror,YawI,YawD,pid_Yaw)
 
 def rc_commands(): #rc commands linear approximations
         global rc_roll
@@ -155,7 +155,7 @@ def rc_commands(): #rc commands linear approximations
         global rc_yaw
         rc_roll = (roll_channel - roll_channel_values[2])/(roll_channel_values[1]-roll_channel_values[0])
         rc_pitch = (pitch_channel - pitch_channel_values[2])/(pitch_channel_values[1]-roll_channel_values[0])
-        rc_throttle = ((1480 if throttle_channel > 1460 and throttle_channel < 1500 else throttle_channel) - throttle_channel_values[2])/(throttle_channel_values[1]-throttle_channel_values[0]) #since the throttle center isnt self-centering giving a small range of throttle idle helps make flight easier
+        rc_throttle = ((1480 if throttle_channel > 1460 and throttle_channel < 1500 else throttle_channel) - throttle_channel_values[2])/(throttle_channel_values[1]-throttle_channel_values[0]) 
         rc_yaw = (yaw_channel - yaw_channel_values[2])/(yaw_channel_values[1]-yaw_channel_values[0])
 
 def motor():
@@ -164,18 +164,18 @@ def motor():
         global motor2
         global motor3
         rc_commands()
-        pitchPID(1,0,0) #P,I,D
-        RollPID(0.54,0.32,0.08) #P,I,D ku=0.9 tu = 2
+        pitchPID(0.6,0.54,0.5) #P,I,D
+        RollPID(0.6,0.54,0.5) #P,I,D ku=0.9 tu = 2
         YawPID(1,0,0) #P,I,D
-        base = rc_throttle *800 + idle
+        base = rc_throttle * 800 + idle
         #front motor CCW
         motor0=(base + pid_pitch + pid_Yaw)/1000 if ((base + pid_pitch + pid_Yaw)/1000) <=2.0 else 2.0
         #rear motor (opposite of front motor) CCW
         motor1=(base - pid_pitch + pid_Yaw)/1000 if ((base - pid_pitch + pid_Yaw)/1000) <=2.0 else 2.0
         #left motor CW
-        motor2= (base + pid_Roll + pid_Yaw)/1000 if ((base + pid_Roll + pid_Yaw)/1000) <=2.0 else 2.0
+        motor2= (base + pid_Roll - pid_Yaw)/1000 if ((base + pid_Roll + pid_Yaw)/1000) <=2.0 else 2.0
         #right motor CW
-        motor3= (base - pid_Roll + pid_Yaw)/1000 if ((base - pid_Roll + pid_Yaw)/1000) <=2.0 else 2.0
+        motor3= (base - pid_Roll - pid_Yaw)/1000 if ((base - pid_Roll + pid_Yaw)/1000) <=2.0 else 2.0
         #print(motor0,motor1,motor2,motor3)
           
 sub = rospy.Subscriber('/rcpub',RC,callback_rc, queue_size=10)
