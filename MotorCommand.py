@@ -60,15 +60,15 @@ def callback_imu(data):
 	veh.imu.gyroscope.x = data.gyroscope.x
 	veh.imu.gyroscope.y = data.gyroscope.y
 	veh.imu.gyroscope.z = data.gyroscope.z
+	
 
 def callback_angular(data):
 	global roll
 	global pitch
 	global yaw
-	roll = data.angular.roll
+	global veh
+	roll = data.angular.roll +1.12
 	pitch = data.angular.pitch
-	yaw = data.angular.yaw
-	#print("Roll is:", roll, "Pitch:", pitch,"Yaw:",yaw)
 
 def pitchPID(p,i,d, PcurrentTime = None, pitchI=0.0):
         #this section sets values to start PID calculations
@@ -125,28 +125,31 @@ def RollPID(p,i,d, RcurrentTime = None,RollI = 0.0):
 def YawPID(p,i,d, YcurrentTime = None, YawI = 0.0):
         #this section sets values to start PID calculations
         global pid_Yaw
+        global veh
         YcurrentTime= YcurrentTime if YcurrentTime is not None else time.time()
-        desiredYaw = yaw + (rc_yaw * 360.0)
-        Yerror = desiredYaw - yaw
-        YlastError = Yerror
+        currentYawRate = veh.imu.gyroscope.z
+        desiredYawRate = rc_yaw * 120
+        yawError = desiredYawRate - currentYawRate
+        YlastError = yawError
         YlastTime = YcurrentTime
         YawI=0
         Yend=200
         Yi = 1
         for Yi in range(1,Yend):
                 global pid_Yaw
-                desiredYaw = yaw + (rc_yaw * 360.0)
+                currentYawRate = veh.imu.gyroscope.z
+                desiredYawRate = rc_yaw * 120
                 YcurrentTime = time.time()
-                Yerror = desiredYaw - yaw
+                yawError = desiredYawRate - currentYawRate
                 YdeltaTime = YcurrentTime - YlastTime
-                YdeltaError = Yerror - YlastError
-                YawI += Yerror * YdeltaTime
+                YdeltaError = yawError - YlastError
+                YawI += yawError * YdeltaTime
                 YawD = YdeltaError/YdeltaTime
-                pid_Yaw = (p * Yerror) + (i * YawI) + (d * YawD)
-                YlastError = Yerror
+                pid_Yaw = (p * yawError) + (i * YawI) + (d * YawD)
+                YlastError = yawError
                 YlastTime = YcurrentTime
                 Yend+=1
-                print(desiredYaw,Yerror,YawI,YawD,pid_Yaw)
+                print(currentYawRate,desiredYawRate,yawError,YawI,YawD)
 
 def rc_commands(): #rc commands linear approximations
         global rc_roll
@@ -157,6 +160,7 @@ def rc_commands(): #rc commands linear approximations
         rc_pitch = (pitch_channel - pitch_channel_values[2])/(pitch_channel_values[1]-roll_channel_values[0])
         rc_throttle = ((1480 if throttle_channel > 1460 and throttle_channel < 1500 else throttle_channel) - throttle_channel_values[2])/(throttle_channel_values[1]-throttle_channel_values[0]) 
         rc_yaw = (yaw_channel - yaw_channel_values[2])/(yaw_channel_values[1]-yaw_channel_values[0])
+	#print(rc_yaw)
 
 def motor():
         global motor0
@@ -166,19 +170,20 @@ def motor():
         rc_commands()
         pitchPID(0.6,0.54,0.5) #P,I,D
         RollPID(0.6,0.54,0.5) #P,I,D ku=0.9 tu = 2
-        YawPID(1,0,0) #P,I,D
+        YawPID(0.5,0.0,0.0) #P,I,D
         base = rc_throttle * 800 + idle
         #front motor CCW
         motor0=(base + pid_pitch + pid_Yaw)/1000 if ((base + pid_pitch + pid_Yaw)/1000) <=2.0 else 2.0
         #rear motor (opposite of front motor) CCW
         motor1=(base - pid_pitch + pid_Yaw)/1000 if ((base - pid_pitch + pid_Yaw)/1000) <=2.0 else 2.0
         #left motor CW
-        motor2= (base + pid_Roll - pid_Yaw)/1000 if ((base + pid_Roll + pid_Yaw)/1000) <=2.0 else 2.0
+        motor2= (base + pid_Roll - pid_Yaw)/1000 if ((base + pid_Roll - pid_Yaw)/1000) <=2.0 else 2.0
         #right motor CW
-        motor3= (base - pid_Roll - pid_Yaw)/1000 if ((base - pid_Roll + pid_Yaw)/1000) <=2.0 else 2.0
+        motor3= (base - pid_Roll - pid_Yaw)/1000 if ((base - pid_Roll - pid_Yaw)/1000) <=2.0 else 2.0
         #print(motor0,motor1,motor2,motor3)
           
 sub = rospy.Subscriber('/rcpub',RC,callback_rc, queue_size=10)
+sub = rospy.Subscriber('/imumpupub', Vehicle, callback_imu, queue_size=10)
 pub = rospy.Publisher('/motorcommand',PWM, queue_size=10)
 subdata = rospy.Subscriber('/madgwickpub', AHRS, callback_angular, queue_size=3)
 rospy.init_node('MotorCommand', anonymous=True) # register the node
@@ -208,3 +213,4 @@ if __name__ == '__main__':
         pub.publish(pwmout) # publish the topic before closing
 
         pass
+
