@@ -14,6 +14,7 @@ from navio2ros.msg import AHRS
 from navio2ros.msg import RC # for reading in RC values from TX
 from navio2ros.msg import PWM # for outputting values to the servo rail
 from navio2ros.msg import Vehicle
+from navio2ros.msg import IMU
 
 #RC channel
 veh=Vehicle()
@@ -54,12 +55,13 @@ def callback_rc(data):
 
 def callback_imu(data):
 	global veh
-	veh.imu.accelerometer.x = data.accelerometer.x
-	veh.imu.accelerometer.y = data.accelerometer.y
-	veh.imu.accelerometer.z = data.accelerometer.z
+	#veh.imu.accelerometer.x = data.accelerometer.x
+	#veh.imu.accelerometer.y = data.accelerometer.y
+	#veh.imu.accelerometer.z = data.accelerometer.z
 	veh.imu.gyroscope.x = data.gyroscope.x
 	veh.imu.gyroscope.y = data.gyroscope.y
 	veh.imu.gyroscope.z = data.gyroscope.z
+	#print(veh.imu.gyroscope.z)
 	
 
 def callback_angular(data):
@@ -125,10 +127,9 @@ def RollPID(p,i,d, RcurrentTime = None,RollI = 0.0):
 def YawPID(p,i,d, YcurrentTime = None, YawI = 0.0):
         #this section sets values to start PID calculations
         global pid_Yaw
-        global veh
         YcurrentTime= YcurrentTime if YcurrentTime is not None else time.time()
         currentYawRate = veh.imu.gyroscope.z
-        desiredYawRate = rc_yaw * 120
+        desiredYawRate = (rc_yaw * 120)-0.12
         yawError = desiredYawRate - currentYawRate
         YlastError = yawError
         YlastTime = YcurrentTime
@@ -138,7 +139,7 @@ def YawPID(p,i,d, YcurrentTime = None, YawI = 0.0):
         for Yi in range(1,Yend):
                 global pid_Yaw
                 currentYawRate = veh.imu.gyroscope.z
-                desiredYawRate = rc_yaw * 120
+                desiredYawRate = (rc_yaw * 120)-0.12
                 YcurrentTime = time.time()
                 yawError = desiredYawRate - currentYawRate
                 YdeltaTime = YcurrentTime - YlastTime
@@ -170,7 +171,7 @@ def motor():
         rc_commands()
         pitchPID(0.6,0.54,0.5) #P,I,D
         RollPID(0.6,0.54,0.5) #P,I,D ku=0.9 tu = 2
-        YawPID(0.5,0.0,0.0) #P,I,D
+        YawPID(.8,0.0,0.0) #P,I,D
         base = rc_throttle * 800 + idle
         #front motor CCW
         motor0=(base + pid_pitch + pid_Yaw)/1000 if ((base + pid_pitch + pid_Yaw)/1000) <=2.0 else 2.0
@@ -183,7 +184,7 @@ def motor():
         #print(motor0,motor1,motor2,motor3)
           
 sub = rospy.Subscriber('/rcpub',RC,callback_rc, queue_size=10)
-sub = rospy.Subscriber('/imumpupub', Vehicle, callback_imu, queue_size=10)
+sub = rospy.Subscriber('/imumpupub', IMU, callback_imu)
 pub = rospy.Publisher('/motorcommand',PWM, queue_size=10)
 subdata = rospy.Subscriber('/madgwickpub', AHRS, callback_angular, queue_size=3)
 rospy.init_node('MotorCommand', anonymous=True) # register the node
