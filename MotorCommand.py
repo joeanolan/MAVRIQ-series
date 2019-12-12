@@ -34,10 +34,10 @@ throttle_channel_in = 2
 yaw_channel_in = 3
 kill_channel_in = 4
 idle = 1400.0
-roll_channel_values= [1000.0,1996.0,1495.0]
+roll_channel_values= [1004.0,1995.0,1497.5]
 pitch_channel_values = [1000.0,1999.0,1499.0]
 throttle_channel_values = [1010.0,1996.0,1480.0]
-yaw_channel_values = [1001.0,1991.0,1500.0]
+yaw_channel_values = [1001.0,1985.0,1500.5]
 
 
 
@@ -69,28 +69,29 @@ def callback_angular(data):
 	global pitch
 	global yaw
 	global veh
-	roll = data.angular.roll +1.12
+	roll = data.angular.roll 
 	pitch = data.angular.pitch
+	#print(pitch,roll)
 
-def pitchPID(p,i,d, PcurrentTime = None, pitchI=0.0):
+def pitchPID(p,i,d, PlastTime = 0, PlastError = 0, pitchI=0.0):
         #this section sets values to start PID calculations
         global pid_pitch
-        PcurrentTime= PcurrentTime if PcurrentTime is not None else time.time()
-        desiredPitch = (rc_pitch * 71.0) if abs((rc_pitch * 71.0) + pitch) <= 35.0 else (-35.0 if (rc_pitch * 71.0) < 0 else 35.0) #abs used to remove signs of linear approximation of rc commands, 71 converts max range of 500 into 35 degree max
-        Perror = desiredPitch - pitch
-        PlastError = Perror
-        PlastTime = PcurrentTime
-        PitchI=0
+        #PcurrentTime= PcurrentTime if PcurrentTime is not None else time.time()
+        #desiredPitch = (rc_pitch * 40.0)
+        #Perror = desiredPitch - pitch
+        #PlastError = Perror
+        #PlastTime = PcurrentTime
+        #PitchI=0
         Pend=200
         pi=1
         for pi in range(1,Pend):
                 global pid_pitch
-                desiredPitch = (rc_pitch * 71.0) if abs((rc_pitch * 71.0) + pitch) <= 35.0 else (-35.0 if (rc_pitch * 71.0) < 0.0 else 35.0)  #abs used to remove signs of linear approximation of rc commands, 71 converts max range of 500 into 35 degree max
+                desiredPitch = (rc_pitch * 40.0)
                 PcurrentTime = time.time()
                 Perror = desiredPitch - pitch
                 PdeltaTime = PcurrentTime - PlastTime
                 PdeltaError = Perror - PlastError
-                pitchI += Perror * PdeltaTime
+                pitchI = Perror * PdeltaTime
                 pitchD = PdeltaError/PdeltaTime
                 pid_pitch = (p *Perror) + (i * pitchI) + (d * pitchD)
                 PlastError = Perror
@@ -98,38 +99,38 @@ def pitchPID(p,i,d, PcurrentTime = None, pitchI=0.0):
                 Pend+=1
                 #print(PlastTime,PlastError,PcurrentTime,Perror,pitchI,pitchD,pid_pitch)
                 
-def RollPID(p,i,d, RcurrentTime = None,RollI = 0.0):
+def RollPID(p,i,d, RlastTime = 0,RollI = 0.0,RlastError=0):
         #this section sets values to start PID calculations
         global pid_Roll
-        RcurrentTime= RcurrentTime if RcurrentTime is not None else time.time()
-        desiredRoll = (rc_roll * 71.0) if abs((rc_roll * 71.0) + roll) <= 35.0 else (-35.0 if (rc_roll * 71.0) < 0.0 else 35.0)
-        Rerror = desiredRoll - roll
-        RlastError = Rerror
-        RlastTime = RcurrentTime
-        RollI=0
+        #RcurrentTime= time.time()
+        #desiredRoll = (rc_roll * 40.0)
+        #Rerror = desiredRoll - roll
+        #RlastError = Rerror
+        #RlastTime = RcurrentTime if RlastTime is None else 0
+        #RollI=0
         Rend=200
         Ri = 1
-        for Ri in range(1,Rend):
+        for i in range(1,Rend):
                 global pid_Roll
-                desiredRoll = (rc_roll * 71.0) if abs((rc_roll * 71.0) + roll) <= 35.0 else (-35.0 if (rc_roll * 71.0) < 0.0 else 35.0)
+                desiredRoll = (rc_roll * 40.0)
                 RcurrentTime = time.time()
                 Rerror = desiredRoll - roll
                 RdeltaTime = RcurrentTime - RlastTime
                 RdeltaError = Rerror - RlastError
-                RollI += Rerror * RdeltaTime
+                RollI = Rerror * RdeltaTime
                 RollD = RdeltaError/RdeltaTime
                 pid_Roll = (p *Rerror) + (i * RollI) + (d * RollD)
                 RlastError = Rerror
                 RlastTime = RcurrentTime
                 Rend+=1
-                #print(desiredRoll)
+                #print(desiredRoll,Rerror,RollI,RollD,RdeltaTime,RdeltaError)
 
 def YawPID(p,i,d, YcurrentTime = None, YawI = 0.0):
         #this section sets values to start PID calculations
         global pid_Yaw
         YcurrentTime= YcurrentTime if YcurrentTime is not None else time.time()
         currentYawRate = veh.imu.gyroscope.z
-        desiredYawRate = (rc_yaw * 120)-0.12
+        desiredYawRate = (rc_yaw * 120)
         yawError = desiredYawRate - currentYawRate
         YlastError = yawError
         YlastTime = YcurrentTime
@@ -139,18 +140,18 @@ def YawPID(p,i,d, YcurrentTime = None, YawI = 0.0):
         for Yi in range(1,Yend):
                 global pid_Yaw
                 currentYawRate = veh.imu.gyroscope.z
-                desiredYawRate = (rc_yaw * 120)-0.12
+                desiredYawRate = (rc_yaw * 120)
                 YcurrentTime = time.time()
                 yawError = desiredYawRate - currentYawRate
                 YdeltaTime = YcurrentTime - YlastTime
                 YdeltaError = yawError - YlastError
-                YawI += yawError * YdeltaTime
+                YawI = yawError * YdeltaTime
                 YawD = YdeltaError/YdeltaTime
                 pid_Yaw = (p * yawError) + (i * YawI) + (d * YawD)
                 YlastError = yawError
                 YlastTime = YcurrentTime
                 Yend+=1
-                print(currentYawRate,desiredYawRate,yawError,YawI,YawD)
+                #print(currentYawRate,desiredYawRate,yawError,YawI,YawD)
 
 def rc_commands(): #rc commands linear approximations
         global rc_roll
@@ -159,7 +160,7 @@ def rc_commands(): #rc commands linear approximations
         global rc_yaw
         rc_roll = (roll_channel - roll_channel_values[2])/(roll_channel_values[1]-roll_channel_values[0])
         rc_pitch = (pitch_channel - pitch_channel_values[2])/(pitch_channel_values[1]-roll_channel_values[0])
-        rc_throttle = ((1480 if throttle_channel > 1460 and throttle_channel < 1500 else throttle_channel) - throttle_channel_values[2])/(throttle_channel_values[1]-throttle_channel_values[0]) 
+        #rc_throttle = ((1480 if throttle_channel > 1460 and throttle_channel < 1500 else throttle_channel) - throttle_channel_values[2])/(throttle_channel_values[1]-throttle_channel_values[0]) 
         rc_yaw = (yaw_channel - yaw_channel_values[2])/(yaw_channel_values[1]-yaw_channel_values[0])
 	#print(rc_yaw)
 
@@ -169,10 +170,10 @@ def motor():
         global motor2
         global motor3
         rc_commands()
-        pitchPID(0.6,0.54,0.5) #P,I,D
-        RollPID(0.6,0.54,0.5) #P,I,D ku=0.9 tu = 2
-        YawPID(.8,0.0,0.0) #P,I,D
-        base = rc_throttle * 800 + idle
+        pitchPID(1.1,0.001,0.135) #P,I,D
+        RollPID(1.1,0.001,0.135) #P,I,D 
+        YawPID(0,0,0.0) #P,I,D
+        base = throttle_channel
         #front motor CCW
         motor0=(base + pid_pitch + pid_Yaw)/1000 if ((base + pid_pitch + pid_Yaw)/1000) <=2.0 else 2.0
         #rear motor (opposite of front motor) CCW
@@ -214,4 +215,3 @@ if __name__ == '__main__':
         pub.publish(pwmout) # publish the topic before closing
 
         pass
-
