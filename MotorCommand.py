@@ -73,85 +73,59 @@ def callback_angular(data):
 	pitch = data.angular.pitch
 	#print(pitch,roll)
 
-def pitchPID(p,i,d, PlastTime = 0, PlastError = 0, pitchI=0.0):
+def pitchPID(p,i,d, PlastTime = time.time(), PlastError = 0, pitchI=0.0):
         #this section sets values to start PID calculations
         global pid_pitch
-        #PcurrentTime= PcurrentTime if PcurrentTime is not None else time.time()
-        #desiredPitch = (rc_pitch * 40.0)
-        #Perror = desiredPitch - pitch
-        #PlastError = Perror
-        #PlastTime = PcurrentTime
-        #PitchI=0
-        Pend=200
-        pi=1
-        for pi in range(1,Pend):
-                global pid_pitch
-                desiredPitch = (rc_pitch * 40.0)
-                PcurrentTime = time.time()
-                Perror = desiredPitch - pitch
-                PdeltaTime = PcurrentTime - PlastTime
-                PdeltaError = Perror - PlastError
-                pitchI = Perror * PdeltaTime
-                pitchD = PdeltaError/PdeltaTime
-                pid_pitch = (p *Perror) + (i * pitchI) + (d * pitchD)
-                PlastError = Perror
-                PlastTime = PcurrentTime
-                Pend+=1
-                #print(PlastTime,PlastError,PcurrentTime,Perror,pitchI,pitchD,pid_pitch)
+        global pid_pitch
+        desiredPitch = (rc_pitch * 40.0)
+        PcurrentTime = time.time()
+        Perror = desiredPitch - pitch
+        PdeltaTime = PcurrentTime - PlastTime
+        PdeltaError = Perror - PlastError
+        pitchI += ((PlastError+Perror)/2) * PdeltaTime
+        pitchD = PdeltaError/PdeltaTime
+        pid_pitch = (p *Perror) + (i * pitchI) + (d * pitchD)
+        PlastError = Perror
+        PlastTime = PcurrentTime
+        #print(PlastTime,PlastError,PcurrentTime,Perror,pitchI,pitchD,pid_pitch)
                 
-def RollPID(p,i,d, RlastTime = 0,RollI = 0.0,RlastError=0):
+def RollPID(p,i,d, RlastTime = time.time(),RollI = 0.0,RlastError=0):
         #this section sets values to start PID calculations
         global pid_Roll
-        #RcurrentTime= time.time()
-        #desiredRoll = (rc_roll * 40.0)
-        #Rerror = desiredRoll - roll
-        #RlastError = Rerror
-        #RlastTime = RcurrentTime if RlastTime is None else 0
-        #RollI=0
-        Rend=200
-        Ri = 1
-        for i in range(1,Rend):
-                global pid_Roll
-                desiredRoll = (rc_roll * 40.0)
-                RcurrentTime = time.time()
-                Rerror = desiredRoll - roll
-                RdeltaTime = RcurrentTime - RlastTime
-                RdeltaError = Rerror - RlastError
-                RollI = Rerror * RdeltaTime
-                RollD = RdeltaError/RdeltaTime
-                pid_Roll = (p *Rerror) + (i * RollI) + (d * RollD)
-                RlastError = Rerror
-                RlastTime = RcurrentTime
-                Rend+=1
-                #print(desiredRoll,Rerror,RollI,RollD,RdeltaTime,RdeltaError)
+        desiredRoll = (rc_roll * 40.0)
+        RcurrentTime = time.time()
+        Rerror = desiredRoll - roll
+        RdeltaTime = RcurrentTime - RlastTime
+        RdeltaError = Rerror - RlastError
+        RollI += ((RlastError+Rerror)/2) * RdeltaTime
+        RollD = RdeltaError/RdeltaTime
+        pid_Roll = (p *Rerror) + (i * RollI) + (d * RollD)
+        RlastError = Rerror
+        RlastTime = RcurrentTime
+        #print(desiredRoll,Rerror,RollI,RollD,RdeltaTime,RdeltaError)
 
-def YawPID(p,i,d, YcurrentTime = None, YawI = 0.0):
+def YawPID(p,i,d, YlastTime = time.time(), YawI = 0.0,YlastError = 0):
         #this section sets values to start PID calculations
         global pid_Yaw
-        YcurrentTime= YcurrentTime if YcurrentTime is not None else time.time()
+        #YawI=0
+        #Yend=200
+        #Yi = 1
+        #for Yi in range(1,Yend):
+        global pid_Yaw
         currentYawRate = veh.imu.gyroscope.z
         desiredYawRate = (rc_yaw * 120)
+        YcurrentTime = time.time()
         yawError = desiredYawRate - currentYawRate
+        YdeltaTime = YcurrentTime - YlastTime
+        YdeltaError = yawError - YlastError
+        YawI += ((YlastError+yawError)/2) * YdeltaTime
+        YawD = YdeltaError/YdeltaTime
+        pid_Yaw = (p * yawError) + (i * YawI) + (d * YawD)
+        #print(YawI)
         YlastError = yawError
         YlastTime = YcurrentTime
-        YawI=0
-        Yend=200
-        Yi = 1
-        for Yi in range(1,Yend):
-                global pid_Yaw
-                currentYawRate = veh.imu.gyroscope.z
-                desiredYawRate = (rc_yaw * 120)
-                YcurrentTime = time.time()
-                yawError = desiredYawRate - currentYawRate
-                YdeltaTime = YcurrentTime - YlastTime
-                YdeltaError = yawError - YlastError
-                YawI = yawError * YdeltaTime
-                YawD = YdeltaError/YdeltaTime
-                pid_Yaw = (p * yawError) + (i * YawI) + (d * YawD)
-                YlastError = yawError
-                YlastTime = YcurrentTime
-                Yend+=1
-                #print(currentYawRate,desiredYawRate,yawError,YawI,YawD)
+
+        
 
 def rc_commands(): #rc commands linear approximations
         global rc_roll
@@ -169,10 +143,6 @@ def motor():
         global motor1
         global motor2
         global motor3
-        rc_commands()
-        pitchPID(1.1,0.001,0.135) #P,I,D
-        RollPID(1.1,0.001,0.135) #P,I,D 
-        YawPID(0,0,0.0) #P,I,D
         base = throttle_channel
         #front motor CCW
         motor0=(base + pid_pitch + pid_Yaw)/1000 if ((base + pid_pitch + pid_Yaw)/1000) <=2.0 else 2.0
@@ -195,6 +165,10 @@ if __name__ == '__main__':
         while not rospy.is_shutdown():
                 rate = rospy.Rate(50)
                 for i in range(len(pwmout.channel)):
+                        rc_commands()
+                        pitchPID(1.1,0.001,0.2) #P,I,D
+                        RollPID(1.1,0.001,0.2) #P,I,D 
+                        YawPID(3.0,0.01,0.5) #P,I,D
                         motor()
                         if kill_channel >= 1200: #in case things go wild
                                 while kill_channel >= 1200:  
